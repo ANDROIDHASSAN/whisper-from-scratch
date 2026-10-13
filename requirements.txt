@@ -1,0 +1,4 @@
+torch>=2.4
+numpy
+huggingface_hub
+tokenizers
