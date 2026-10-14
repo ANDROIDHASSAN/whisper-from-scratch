@@ -35,7 +35,7 @@ def batch_features(mel: np.ndarray, index: list[dict], ids: list[int], device: s
 def batch_tokens(index: list[dict], ids: list[int], tok, n_ctx: int, device: str) -> tuple[torch.Tensor, torch.Tensor]:
     """Decoder input (teacher forcing) and targets. Target -100 = no loss (padding, task, notimestamps)."""
     seqs = [(prefix(tok, index[i]["lang"]) + tok.encode(index[i]["text"]))[: n_ctx - 1] + [tok.eot] for i in ids]
-    T = max(map(len, seqs)) - 1
+    T = -(-(max(map(len, seqs)) - 1) // 32) * 32  # a few fixed lengths, so MPS reuses its buffers instead of growing
     inp = torch.full((len(seqs), T), tok.eot)
     tgt = torch.full((len(seqs), T), -100)
     for b, s in enumerate(seqs):
@@ -128,12 +128,12 @@ def main() -> None:
         opt.step()
         sched.step()
         opt.zero_grad(set_to_none=True)
+        if args.device == "mps" and step % 10 == 0:
+            torch.mps.empty_cache()
         if step % 50 == 0:
             print(f"step {step:6d}  loss {running / 50:.3f}  lr {sched.get_last_lr()[0]:.2e}  "
                   f"{(time.time() - t0) / 60:.1f} min", flush=True)
             running = 0.0
-            if args.device == "mps":
-                torch.mps.empty_cache()
         if step % args.eval_every == 0 or step == args.steps:
             scores = evaluate(model, tok, dev_mel, dev_index, dev_ids, args.device)
             wer = sum(s[0] for s in scores.values()) / len(scores)

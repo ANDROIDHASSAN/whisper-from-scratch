@@ -26,8 +26,24 @@ number is the baseline the Hindi fine-tune is measured against.
 
 The mel filterbank written here matches the one OpenAI ships (`preprocessor_config.json`) to within 5 × 10⁻⁸.
 
-> **Status:** architecture, front-end, tokenizers, decoding, data pipeline and training are complete and
-> checked. Training from scratch and the Hindi fine-tune are next; results will be added here from the logs.
+## Fine-tuning tiny on Hindi
+
+`openai/whisper-tiny` fine-tuned on FLEURS Hindi train (2,115 clips): 4,000 steps, batch 4 × 2 accumulated,
+lr 1e-5 with 400 warmup steps, no dropout, 83 min on an M1 Pro. Scored on the full FLEURS Hindi test set,
+greedy decoding:
+
+| Model | WER | CER |
+|---|---|---|
+| `openai/whisper-tiny` as released (418 clips) | 138.9% | 122.7% |
+| fine-tuned here (417 clips) | **49.2%** | **21.2%** |
+
+Dev WER (100 clips) by step: 58.9% at 500, 51.4% at 1,000, 48.6% at 1,500, then flat between 48% and 50% to
+4,000: with 2k clips the model has learned what this data can teach it. It now writes Devanagari
+(`कुछ अणुओं में अस्थिर केंद्रक` → `कुछ अडगों मे आज स्थिक केंद्रा`) where the released model wrote romanized
+or English words.
+
+> **Status:** architecture, front-end, tokenizers, decoding, data pipeline and the Hindi fine-tune are complete
+> and measured. Training from scratch is next; results will be added here from the logs.
 
 ## Paper → code
 
@@ -83,7 +99,7 @@ python check.py
 python verify_openai.py --lang en --clips 50          # OpenAI's weights on this code
 python data.py                                        # FLEURS hi + mr + en -> features, Indic tokenizer
 python train.py --init scratch --name tiny-indic      # from scratch, paper's tiny shape
-python train.py --init openai/whisper-tiny --langs hi --name tiny-hi --lr 1e-5 --dropout 0 --steps 4000
+python train.py --init openai/whisper-tiny --langs hi --name tiny-hi --lr 1e-5 --warmup 400 --dropout 0 --steps 4000 --batch 4 --accum 2
 python evaluate.py runs/tiny-hi.pt --langs hi --beam 5
 python evaluate.py runs/tiny-hi.pt --wav clip.wav     # language ID + transcript
 ```
